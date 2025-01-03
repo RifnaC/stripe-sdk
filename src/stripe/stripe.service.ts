@@ -15,7 +15,10 @@ export class StripeService {
 
     this.stripe = new Stripe(secretKey, {
       apiVersion: '2024-12-18.acacia',
-    });
+      maxNetworkRetries: 2
+    },);
+
+    
   }
 
   getStripeInstance(): Stripe {
