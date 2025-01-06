@@ -1,14 +1,36 @@
 import { Controller, Post, Body, Get, Param, Put, Delete } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-
+import { v4 as uuidv4 } from 'uuid';
 @Controller('payments')
 export class PaymentsController {
     constructor(private readonly paymentService: PaymentService) { }
 
-
     @Post('create-customer')
-    async createCustomer(@Body('email') email: string, @Body('name') name: string, @Body('paymentMethod') paymentMethod: string) {
-        return this.paymentService.createCustomer(email, name, paymentMethod);
+    @Post('create-customer')
+    async createCustomer(@Body() body: {
+        email: string, 
+        name: string,
+        address: {
+            line1: string,
+            line2?: string,
+            city: string,
+            state: string,
+            postal_code: string,
+            country: string,
+        },
+        phone: string,
+        idempotencyKey: string,
+        paymentMethod?: string,
+    }) {
+        const { email, name, address, phone, idempotencyKey, paymentMethod } = body;
+        return this.paymentService.createCustomer(
+            email,
+            name,
+            address,
+            phone,
+            idempotencyKey,
+            paymentMethod
+        );
     }
 
     @Get('customers')
@@ -22,7 +44,8 @@ export class PaymentsController {
     }
 
     @Put('/:id')
-    async editCustomer(@Param('id') customerId: string, @Body('name') name?: string, @Body('email') email?: string) {
+    async editCustomer(@Param('id') customerId: string, @Body() body: { email?: string, name?: string, }) {
+        const { name, email } = body;
         return this.paymentService.editCustomer(customerId, name, email);
     }
 
@@ -33,9 +56,9 @@ export class PaymentsController {
 
     // create payment intent of the customer
     @Post('create-intent')
-    async createPaymentIntent(@Body() body: { customerId: string, amount: number; currency: string }) {
-        const { customerId, amount, currency } = body;
-        return await this.paymentService.createPaymentIntent(customerId, amount, currency);
+    async createPaymentIntent(@Body() body: { customerId: string, amount: number; currency: string, idempotencyKey:string }) {
+        const { customerId, amount, currency, idempotencyKey } = body;
+        return await this.paymentService.createPaymentIntent(customerId, amount, currency, idempotencyKey);
     }
 
     // retrieve payment intent details by payment intent id
@@ -60,7 +83,4 @@ export class PaymentsController {
     async getInvoice(@Param('invoiceId') invoiceId: string) {
         return this.paymentService.invoicePaymentIntent(invoiceId);
     }
-
-
-
 }

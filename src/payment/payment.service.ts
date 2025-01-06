@@ -1,19 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { createHash } from 'crypto';
 import { StripeService } from 'src/stripe/stripe.service';
-import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PaymentService {
     constructor(private readonly stripeService: StripeService) { }
 
-     // Create a customer
-    async createCustomer(email: string, name?: string, paymentMethod?: string) {
+    // Create a customer
+    async createCustomer(email: string,
+        name: string,
+        address: { line1: string, line2?: string, city?: string, state?: string, postal_code?: string, country?: string },
+        phone: string,
+        idempotencyKey: string,
+        paymentMethod: string,
+    ) {
         const stripe = this.stripeService.getStripeInstance();
 
         return stripe.customers.create({
             email,
             name,
+            address,
+            phone,
             payment_method: paymentMethod || "pm_card_visa",
             invoice_settings: {
                 default_payment_method: "pm_card_visa"
@@ -21,7 +27,11 @@ export class PaymentService {
             preferred_locales: [
                 "en"
             ]
-        });
+        },
+            {
+                idempotencyKey
+            }
+        );
     }
 
     // All customers list
@@ -49,9 +59,8 @@ export class PaymentService {
         return await this.stripeService.getStripeInstance().customers.del(customerId);
     }
 
-
     // create payment intent
-    async createPaymentIntent(customerId:string, amount: number, currency: string) {
+    async createPaymentIntent(customerId: string, amount: number, currency: string, idempotencyKey: string) {
         try {
             const stripe = this.stripeService.getStripeInstance();
             return stripe.paymentIntents.create({
@@ -60,11 +69,10 @@ export class PaymentService {
                 customer: customerId,
                 payment_method_types: ['card'],
                 payment_method: "pm_card_visa",
-                automatic_payment_methods: {
-                    enabled: true, // Automatically manage payment methods
-                    allow_redirects: 'never', // Disallow redirect-based payment methods
-                },
-            });
+            },
+                {
+                    idempotencyKey
+                });
         } catch (error) {
             console.error('Error creating payment intent:', error);
             throw error;
@@ -72,11 +80,12 @@ export class PaymentService {
     }
 
     // retrieve payment intent by payment intent id
-   async retrievePaymentIntent(paymentIntentId: string){
-    const stripe = this.stripeService.getStripeInstance();
-    return stripe.paymentIntents.retrieve(paymentIntentId)
-   }
+    async retrievePaymentIntent(paymentIntentId: string) {
+        const stripe = this.stripeService.getStripeInstance();
+        return stripe.paymentIntents.retrieve(paymentIntentId)
+    }
 
+    //confirm payment intent
     async confirmPaymentIntent(paymentIntentId: string, paymentMethodId: string,) {
         const stripe = this.stripeService.getStripeInstance();
         return stripe.paymentIntents.confirm(paymentIntentId, {
