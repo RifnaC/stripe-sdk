@@ -31,9 +31,17 @@ export class PaymentsController {
         return this.paymentService.deleteCustomer(customerId);
     }
 
+    // create payment intent of the customer
     @Post('create-intent')
-    async createPaymentIntent(@Body('amount') amount: number, @Body('currency') currency: string) {
-        return this.paymentService.createPaymentIntent(amount, currency);
+    async createPaymentIntent(@Body() body: { customerId: string, amount: number; currency: string }) {
+        const { customerId, amount, currency } = body;
+        return await this.paymentService.createPaymentIntent(customerId, amount, currency);
+    }
+
+    // retrieve payment intent details by payment intent id
+    @Get('retrieve-intent/:id')
+    async retrievePaymentIntent(@Param('id') id: string) {
+        return await this.paymentService.retrievePaymentIntent(id);
     }
 
     @Post('confirm-intent')

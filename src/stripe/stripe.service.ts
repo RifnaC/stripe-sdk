@@ -17,8 +17,6 @@ export class StripeService {
       apiVersion: '2024-12-18.acacia',
       maxNetworkRetries: 2
     },);
-
-    
   }
 
   getStripeInstance(): Stripe {

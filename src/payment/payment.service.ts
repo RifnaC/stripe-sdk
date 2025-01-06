@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 export class PaymentService {
     constructor(private readonly stripeService: StripeService) { }
 
-    //create customer intent
+     // Create a customer
     async createCustomer(email: string, name?: string, paymentMethod?: string) {
         const stripe = this.stripeService.getStripeInstance();
 
@@ -51,17 +51,18 @@ export class PaymentService {
 
 
     // create payment intent
-    async createPaymentIntent(amount: number, currency: string,) {
+    async createPaymentIntent(customerId:string, amount: number, currency: string) {
         try {
             const stripe = this.stripeService.getStripeInstance();
-
             return stripe.paymentIntents.create({
                 amount,
                 currency,
+                customer: customerId,
+                payment_method_types: ['card'],
                 payment_method: "pm_card_visa",
-
                 automatic_payment_methods: {
                     enabled: true, // Automatically manage payment methods
+                    allow_redirects: 'never', // Disallow redirect-based payment methods
                 },
             });
         } catch (error) {
@@ -70,9 +71,14 @@ export class PaymentService {
         }
     }
 
+    // retrieve payment intent by payment intent id
+   async retrievePaymentIntent(paymentIntentId: string){
+    const stripe = this.stripeService.getStripeInstance();
+    return stripe.paymentIntents.retrieve(paymentIntentId)
+   }
+
     async confirmPaymentIntent(paymentIntentId: string, paymentMethodId: string,) {
         const stripe = this.stripeService.getStripeInstance();
-
         return stripe.paymentIntents.confirm(paymentIntentId, {
             payment_method: paymentMethodId,
         });
@@ -90,17 +96,6 @@ export class PaymentService {
         return this.stripeService.getStripeInstance().invoices.retrieve(
             invoiceId
         );
-    }
-
-    //webhook payment
-    async handlePaymentIntentWebhook() {
-        return this.stripeService.getStripeInstance().webhookEndpoints.create({
-            url: '/webhook',
-            enabled_events: ['customer.created', 'payment_intent.succeeded', 'payment_intent.payment_failed'],
-            metadata: {
-                my_custom_metadata: 'example_value',
-            },
-        })
     }
 
 
