@@ -107,5 +107,82 @@ export class PaymentService {
         );
     }
 
+    async createPrice() {
+        const stripe = this.stripeService.getStripeInstance();
+        await stripe.prices.create({
+            currency: 'usd',
+            unit_amount: 1000,
+            recurring: {
+                interval: 'month',
+            },
+            product_data: {
+                name: 'Gold Plan',
+            },
+        });
+    }
 
+    // Create a subscription with dynamic price ID and optional trial
+    async createSubscription(customerId: string, priceId: string,) {
+        const stripe = this.stripeService.getStripeInstance();
+        try {
+            const subscription=  await stripe.subscriptions.create({
+                customer: customerId,
+                items: [
+                    {
+                        price: priceId, // Allow dynamic price plan
+                    },
+                ],
+                payment_behavior: 'default_incomplete',
+                collection_method: 'charge_automatically',
+            });
+            return subscription;
+        } catch (error) {
+            console.error('Error creating subscription:', error);
+            throw error;
+        }
+    }
+
+    // Update subscription (e.g., change plan or quantity)
+    async updateSubscription(subscriptionId: string, priceId: string, quantity: number = 1) {
+        const stripe = this.stripeService.getStripeInstance();
+
+        try {
+            return await stripe.subscriptions.update(subscriptionId, {
+                items: [
+                    {
+                        id: (await stripe.subscriptions.retrieve(subscriptionId)).items.data[0].id,
+                        price: priceId,
+                        quantity,
+                    },
+                ],
+            });
+        } catch (error) {
+            console.error('Error updating subscription:', error);
+            throw error;
+        }
+    }
+
+    // Cancel subscription
+    async cancelSubscription(subscriptionId: string) {
+        const stripe = this.stripeService.getStripeInstance();
+
+        try {
+            return await stripe.subscriptions.cancel(subscriptionId);
+        } catch (error) {
+            console.error('Error canceling subscription:', error);
+            throw error;
+        }
+    }
+
+    // Retrieve a subscription by subscription ID
+    async getSubscription(subscriptionId: string) {
+        const stripe = this.stripeService.getStripeInstance();
+        return await stripe.subscriptions.retrieve(subscriptionId);
+    }
+
+    async getPriceList() {
+        const stripe = this.stripeService.getStripeInstance();
+        const price = await stripe.prices.list();
+        return price;
+    }
 }

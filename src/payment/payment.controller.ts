@@ -1,14 +1,17 @@
 import { Controller, Post, Body, Get, Param, Put, Delete } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { v4 as uuidv4 } from 'uuid';
+
 @Controller('payments')
 export class PaymentsController {
     constructor(private readonly paymentService: PaymentService) { }
 
-    @Post('create-customer')
+    @Get('list')
+    async getPriceList() {
+        return this.paymentService.getPriceList();
+    }
     @Post('create-customer')
     async createCustomer(@Body() body: {
-        email: string, 
+        email: string,
         name: string,
         address: {
             line1: string,
@@ -56,7 +59,7 @@ export class PaymentsController {
 
     // create payment intent of the customer
     @Post('create-intent')
-    async createPaymentIntent(@Body() body: { customerId: string, amount: number; currency: string, idempotencyKey:string }) {
+    async createPaymentIntent(@Body() body: { customerId: string, amount: number; currency: string, idempotencyKey: string }) {
         const { customerId, amount, currency, idempotencyKey } = body;
         return await this.paymentService.createPaymentIntent(customerId, amount, currency, idempotencyKey);
     }
@@ -83,4 +86,30 @@ export class PaymentsController {
     async getInvoice(@Param('invoiceId') invoiceId: string) {
         return this.paymentService.invoicePaymentIntent(invoiceId);
     }
+
+    @Post("create-price")
+    async createPrice() {
+        return this.paymentService.createPrice();
+    }
+    @Post('subscription')
+    async createSubscription(@Body() body: { customerId: string, priceId: string }) {
+        const { customerId, priceId } = body;
+        return this.paymentService.createSubscription(customerId, priceId);
+    }
+
+    @Get('subscription/:subscriptionId')
+    async getSubscription(@Param('subscriptionId') subscriptionId: string) {
+        return this.paymentService.getSubscription(subscriptionId);
+    }
+    @Put('subscription/:subscriptionId')
+    async updateSubscription(@Param('subscriptionId') subscriptionId: string, @Body('priceId') priceId: string) {
+        return this.paymentService.updateSubscription(subscriptionId, priceId);
+    }
+
+    @Delete("subscription/:subscriptionId")
+    async cancelSubscription(@Param('subscriptionId') subscriptionId: string) {
+        return this.paymentService.cancelSubscription(subscriptionId);
+    }
+
+
 }
