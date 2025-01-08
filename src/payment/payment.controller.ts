@@ -1,115 +1,224 @@
-import { Controller, Post, Body, Get, Param, Put, Delete } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query, HttpCode, HttpStatus, Res } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 
-@Controller('payments')
-export class PaymentsController {
+@Controller('payment')
+export class PaymentController {
     constructor(private readonly paymentService: PaymentService) { }
 
-    @Get('list')
+    // 1. Get Price List: Retrieve product pricing from Stripe
+    @Get('prices')
+    @HttpCode(HttpStatus.OK)
     async getPriceList() {
-        return this.paymentService.getPriceList();
+        try {
+            const prices = await this.paymentService.getPriceList();
+            return { prices };
+        } catch (error) {
+            console.error('Error fetching price list:', error);
+            throw error;
+        }
     }
-    @Post('create-customer')
-    async createCustomer(@Body() body: {
-        email: string,
-        name: string,
-        address: {
-            line1: string,
-            line2?: string,
-            city: string,
-            state: string,
-            postal_code: string,
-            country: string,
-        },
-        phone: string,
-        idempotencyKey: string,
-        paymentMethod?: string,
+
+    // 2. Create Customer: Create a new customer with their payment method
+    @Post('customer')
+    @HttpCode(HttpStatus.CREATED)
+    async createCustomer(@Body() customerData: {
+        email: string;
+        name: string;
+        address: { line1: string, line2?: string, city?: string, state?: string, postal_code?: string, country?: string };
+        phone: string;
+        paymentMethod: string;
     }) {
-        const { email, name, address, phone, idempotencyKey, paymentMethod } = body;
-        return this.paymentService.createCustomer(
-            email,
-            name,
-            address,
-            phone,
-            idempotencyKey,
-            paymentMethod
-        );
+        try {
+            const customer = await this.paymentService.createCustomer(
+                customerData.email,
+                customerData.name,
+                customerData.address,
+                customerData.phone,
+                customerData.paymentMethod,
+            );
+            return { customer };
+        } catch (error) {
+            console.error('Error creating customer:', error);
+            throw error;
+        }
     }
 
-    @Get('customers')
-    async getCustomerList() {
-        return this.paymentService.getCustomerList();
+    // 3. Create Payment Intent: Handle payments by creating a payment intent for a customer
+    @Post('payment-intent')
+    @HttpCode(HttpStatus.CREATED)
+    async createPaymentIntent(@Body() paymentIntentData: {
+        customerId: string;
+        amount: number;
+        currency: string;
+        idempotencyKey: string;
+    }) {
+        try {
+            const paymentIntent = await this.paymentService.createPaymentIntent(
+                paymentIntentData.customerId,
+                paymentIntentData.amount,
+                paymentIntentData.currency,
+                paymentIntentData.idempotencyKey,
+            );
+            return { paymentIntent };
+        } catch (error) {
+            console.error('Error creating payment intent:', error);
+            throw error;
+        }
     }
 
-    @Get('/:id')
-    async getCustomerById(@Param('id') customerId: string) {
-        return this.paymentService.getCustomerById(customerId);
+    // 4. Retrieve Payment Intent: Retrieve payment intent details by ID
+    @Get('payment-intent/:paymentIntentId')
+    @HttpCode(HttpStatus.OK)
+    async retrievePaymentIntent(@Param('paymentIntentId') paymentIntentId: string) {
+        try {
+            const paymentIntent = await this.paymentService.retrievePaymentIntent(paymentIntentId);
+            return { paymentIntent };
+        } catch (error) {
+            console.error('Error retrieving payment intent:', error);
+            throw error;
+        }
     }
 
-    @Put('/:id')
-    async editCustomer(@Param('id') customerId: string, @Body() body: { email?: string, name?: string, }) {
-        const { name, email } = body;
-        return this.paymentService.editCustomer(customerId, name, email);
+    // 5. Confirm Payment Intent: Confirm the payment intent when the payment method is provided
+    @Post('payment-intent/confirm')
+    @HttpCode(HttpStatus.OK)
+    async confirmPaymentIntent(@Body() confirmData: {
+        paymentIntentId: string;
+        paymentMethodId: string;
+    }) {
+        try {
+            const confirmation = await this.paymentService.confirmPaymentIntent(
+                confirmData.paymentIntentId,
+                confirmData.paymentMethodId,
+            );
+            return { confirmation };
+        } catch (error) {
+            console.error('Error confirming payment intent:', error);
+            throw error;
+        }
     }
 
-    @Delete('/:id')
-    async deleteCustomer(@Param('id') customerId: string) {
-        return this.paymentService.deleteCustomer(customerId);
+    // 6. Create Invoice: Create and manage invoices for customers
+    @Post('invoice')
+    @HttpCode(HttpStatus.CREATED)
+    async createInvoice(@Body('customer') customerId: string) {
+        try {
+            const invoice = await this.paymentService.createInvoice(customerId);
+            return { invoice };
+        } catch (error) {
+            console.error('Error creating invoice:', error);
+            throw error;
+        }
     }
 
-    // create payment intent of the customer
-    @Post('create-intent')
-    async createPaymentIntent(@Body() body: { customerId: string, amount: number; currency: string, idempotencyKey: string }) {
-        const { customerId, amount, currency, idempotencyKey } = body;
-        return await this.paymentService.createPaymentIntent(customerId, amount, currency, idempotencyKey);
-    }
-
-    // retrieve payment intent details by payment intent id
-    @Get('retrieve-intent/:id')
-    async retrievePaymentIntent(@Param('id') id: string) {
-        return await this.paymentService.retrievePaymentIntent(id);
-    }
-
-    @Post('confirm-intent')
-    async confirmPaymentIntent(
-        @Body('paymentIntentId') paymentIntentId: string,
-        @Body('paymentMethodId') paymentMethodId: string,
-    ) {
-        return this.paymentService.confirmPaymentIntent(paymentIntentId, paymentMethodId);
-    }
-
-    @Post('create-invoice')
-    async createInvoice(@Body('customer') customer: string) {
-        return this.paymentService.createInvoice(customer);
-    }
+    // 7. Get Invoice Details: Get invoice details by invoice ID
     @Get('invoice/:invoiceId')
-    async getInvoice(@Param('invoiceId') invoiceId: string) {
-        return this.paymentService.invoicePaymentIntent(invoiceId);
+    @HttpCode(HttpStatus.OK)
+    async getInvoiceDetails(@Param('invoiceId') invoiceId: string) {
+        try {
+            const invoiceDetails = await this.paymentService.invoicePaymentIntent(invoiceId);
+            return { invoiceDetails };
+        } catch (error) {
+            console.error('Error retrieving invoice details:', error);
+            throw error;
+        }
     }
 
-    @Post("create-price")
-    async createPrice() {
-        return this.paymentService.createPrice();
-    }
+    // 8. Create Subscription: Manage product subscriptions, including trial and price plans
     @Post('subscription')
-    async createSubscription(@Body() body: { customerId: string, priceId: string }) {
-        const { customerId, priceId } = body;
-        return this.paymentService.createSubscription(customerId, priceId);
+    @HttpCode(HttpStatus.CREATED)
+    async createSubscription(@Body() subscriptionData: {
+        customerId: string;
+        priceId: string;
+    }) {
+        try {
+            const subscription = await this.paymentService.createSubscription(
+                subscriptionData.customerId,
+                subscriptionData.priceId,
+            );
+            return { subscription };
+        } catch (error) {
+            console.error('Error creating subscription:', error);
+            throw error;
+        }
     }
 
-    @Get('subscription/:subscriptionId')
-    async getSubscription(@Param('subscriptionId') subscriptionId: string) {
-        return this.paymentService.getSubscription(subscriptionId);
-    }
-    @Put('subscription/:subscriptionId')
-    async updateSubscription(@Param('subscriptionId') subscriptionId: string, @Body('priceId') priceId: string) {
-        return this.paymentService.updateSubscription(subscriptionId, priceId);
+    // 9. Preview Invoices: Preview upcoming invoices based on customer and subscription ID
+    @Get('subscription/:subscriptionId/preview')
+    @HttpCode(HttpStatus.OK)
+    async previewInvoices(
+        @Param('subscriptionId') subscriptionId: string,
+        @Query('customerId') customerId: string,
+        @Query('priceId') priceId: string
+    ) {
+        try {
+            const invoicePreview = await this.paymentService.previewInvoices(
+                customerId,
+                priceId,
+                subscriptionId,
+            );
+            return { invoicePreview };
+        } catch (error) {
+            console.error('Error previewing invoice:', error);
+            throw error;
+        }
     }
 
-    @Delete("subscription/:subscriptionId")
+    // 10. Update Subscription: Update subscriptions (e.g., change plans or quantities)
+    @Post('subscription/:subscriptionId/update')
+    @HttpCode(HttpStatus.OK)
+    async updateSubscription(
+        @Param('subscriptionId') subscriptionId: string,
+        @Body() updateData: { priceId: string; quantity?: number }
+    ) {
+        try {
+            const updatedSubscription = await this.paymentService.updateSubscription(
+                subscriptionId,
+                updateData.priceId,
+                updateData.quantity,
+            );
+            return { updatedSubscription };
+        } catch (error) {
+            console.error('Error updating subscription:', error);
+            throw error;
+        }
+    }
+
+    // 11. Cancel Subscription: Cancel subscriptions
+    @Post('subscription/:subscriptionId/cancel')
+    @HttpCode(HttpStatus.OK)
     async cancelSubscription(@Param('subscriptionId') subscriptionId: string) {
-        return this.paymentService.cancelSubscription(subscriptionId);
+        try {
+            const canceledSubscription = await this.paymentService.cancelSubscription(subscriptionId);
+            return { canceledSubscription };
+        } catch (error) {
+            console.error('Error canceling subscription:', error);
+            throw error;
+        }
     }
 
+    // 12. Get Subscription: Retrieve a subscription by its ID
+    @Get('subscription/:subscriptionId')
+    @HttpCode(HttpStatus.OK)
+    async getSubscription(@Param('subscriptionId') subscriptionId: string) {
+        try {
+            const subscription = await this.paymentService.getSubscription(subscriptionId);
+            return { subscription };
+        } catch (error) {
+            console.error('Error retrieving subscription:', error);
+            throw error;
+        }
+    }
 
+    @Post('top-up')
+    @HttpCode(HttpStatus.OK)
+    async topUp(@Body('amount') amount: number) {
+        try {
+            return await this.paymentService.topUp(amount);
+             ;
+        } catch (error:any) {
+            console.error('Error top-up:', error.message);
+            
+        }
+    }
 }

@@ -36,8 +36,14 @@ export class WebhookController {
             case 'customer.created':
                 const customer = event.data.object as Stripe.Customer;
                 console.log('Customer created:', customer.id);
-                // Add business logic here
+    
                 break;
+
+            case 'checkout.session.completed':
+                const session = event.data.object as Stripe.Checkout.Session;
+                console.log('Payment successful for session:', session.id);
+                break;
+                
             default:
                 console.log(`Unhandled event type ${event.type}`);
         }
