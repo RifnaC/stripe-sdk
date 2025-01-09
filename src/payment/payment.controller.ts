@@ -209,16 +209,19 @@ export class PaymentController {
             throw error;
         }
     }
-
+    
+    // 13. Top-up: Top up an additional block
     @Post('top-up')
-    @HttpCode(HttpStatus.OK)
-    async topUp(@Body('amount') amount: number) {
+    async topUp(@Body() body: {
+        customer: string,
+        amount: number
+    }) {
         try {
-            return await this.paymentService.topUp(amount);
-             ;
-        } catch (error:any) {
+            const { customer, amount } = body;
+            return await this.paymentService.topUp(customer, amount);
+        } catch (error: any) {
             console.error('Error top-up:', error.message);
-            
         }
     }
+
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { StripeService } from 'src/stripe/stripe.service';
+import Stripe from 'stripe';
 
 @Injectable()
 export class PaymentService {
@@ -82,7 +83,6 @@ export class PaymentService {
                 items: [{
                     price: priceId,
                 }],
-                payment_behavior: 'default_incomplete',
                 expand: ['latest_invoice.payment_intent'],
             });
             return subscription;
@@ -141,15 +141,17 @@ export class PaymentService {
         return await stripe.subscriptions.retrieve(subscriptionId);
     }
 
-
-    // 13. Top up for additional block
-    async topUp(amount: number) {
+    async topUp(
+        customerId: string,
+        amount: number,
+    ): Promise<Stripe.InvoiceItem> {
         const stripe = this.stripeService.getStripeInstance();
-        return stripe.topups.create({
-            amount,
-            currency: 'usd',
-            description: 'Top-up for additional block',
-            statement_descriptor: 'Top-up',
+        return stripe.invoiceItems.create({
+            customer: customerId,
+            amount: amount * 100,
+            currency: 'usd', // Adjust to your currency
+            description: 'Subscription Top-Up',
         });
     }
+
 }
