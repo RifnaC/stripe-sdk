@@ -1,5 +1,9 @@
-import { Controller, Post, Get, Param, Body, Query, HttpCode, HttpStatus, Res } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query, HttpCode, HttpStatus, Res, ValidationPipe, UsePipes } from '@nestjs/common';
 import { PaymentService } from './payment.service';
+import { CreateCustomerDto } from './dtos/create-customer.dto';
+import { ConfirmPaymentIntentDto, CreatePaymentIntentDto } from './dtos/payment-intent.dto';
+import { CreateSubscriptionDto, UpdateSubscriptionDto } from './dtos/subscription.dto';
+import { TopUpDto } from './dtos/top-up.dto';
 
 @Controller('payment')
 export class PaymentController {
@@ -21,20 +25,11 @@ export class PaymentController {
     // 2. Create Customer: Create a new customer with their payment method
     @Post('customer')
     @HttpCode(HttpStatus.CREATED)
-    async createCustomer(@Body() customerData: {
-        email: string;
-        name: string;
-        address: { line1: string, line2?: string, city?: string, state?: string, postal_code?: string, country?: string };
-        phone: string;
-        paymentMethod: string;
-    }) {
+    @UsePipes(new ValidationPipe())
+    async createCustomer(@Body() createCustomerDto: CreateCustomerDto) {
         try {
             const customer = await this.paymentService.createCustomer(
-                customerData.email,
-                customerData.name,
-                customerData.address,
-                customerData.phone,
-                customerData.paymentMethod,
+                createCustomerDto
             );
             return { customer };
         } catch (error) {
@@ -46,18 +41,11 @@ export class PaymentController {
     // 3. Create Payment Intent: Handle payments by creating a payment intent for a customer
     @Post('payment-intent')
     @HttpCode(HttpStatus.CREATED)
-    async createPaymentIntent(@Body() paymentIntentData: {
-        customerId: string;
-        amount: number;
-        currency: string;
-        idempotencyKey: string;
-    }) {
+    @UsePipes(new ValidationPipe())
+    async createPaymentIntent(@Body() createPaymentIntentDto: CreatePaymentIntentDto) {
         try {
             const paymentIntent = await this.paymentService.createPaymentIntent(
-                paymentIntentData.customerId,
-                paymentIntentData.amount,
-                paymentIntentData.currency,
-                paymentIntentData.idempotencyKey,
+                createPaymentIntentDto
             );
             return { paymentIntent };
         } catch (error) {
@@ -78,18 +66,15 @@ export class PaymentController {
             throw error;
         }
     }
-
     // 5. Confirm Payment Intent: Confirm the payment intent when the payment method is provided
     @Post('payment-intent/confirm')
     @HttpCode(HttpStatus.OK)
-    async confirmPaymentIntent(@Body() confirmData: {
-        paymentIntentId: string;
-        paymentMethodId: string;
-    }) {
+    @UsePipes(new ValidationPipe())
+    async confirmPaymentIntent(@Body() confirmPaymentIntentDto: ConfirmPaymentIntentDto
+    ) {
         try {
             const confirmation = await this.paymentService.confirmPaymentIntent(
-                confirmData.paymentIntentId,
-                confirmData.paymentMethodId,
+                confirmPaymentIntentDto
             );
             return { confirmation };
         } catch (error) {
@@ -127,14 +112,11 @@ export class PaymentController {
     // 8. Create Subscription: Manage product subscriptions, including trial and price plans
     @Post('subscription')
     @HttpCode(HttpStatus.CREATED)
-    async createSubscription(@Body() subscriptionData: {
-        customerId: string;
-        priceId: string;
-    }) {
+    @UsePipes(new ValidationPipe())
+    async createSubscription(@Body() createSubscriptionDto: CreateSubscriptionDto) {
         try {
             const subscription = await this.paymentService.createSubscription(
-                subscriptionData.customerId,
-                subscriptionData.priceId,
+                createSubscriptionDto
             );
             return { subscription };
         } catch (error) {
@@ -167,15 +149,15 @@ export class PaymentController {
     // 10. Update Subscription: Update subscriptions (e.g., change plans or quantities)
     @Post('subscription/:subscriptionId/update')
     @HttpCode(HttpStatus.OK)
+    @UsePipes(new ValidationPipe())
     async updateSubscription(
         @Param('subscriptionId') subscriptionId: string,
-        @Body() updateData: { priceId: string; quantity?: number }
+        @Body() updateSubscriptionDto: UpdateSubscriptionDto,
     ) {
         try {
             const updatedSubscription = await this.paymentService.updateSubscription(
                 subscriptionId,
-                updateData.priceId,
-                updateData.quantity,
+                updateSubscriptionDto
             );
             return { updatedSubscription };
         } catch (error) {
@@ -209,16 +191,14 @@ export class PaymentController {
             throw error;
         }
     }
-    
+
     // 13. Top-up: Top up an additional block
     @Post('top-up')
-    async topUp(@Body() body: {
-        customer: string,
-        amount: number
-    }) {
+    @HttpCode(HttpStatus.OK)
+    @UsePipes(new ValidationPipe())
+    async topUp(@Body() topUpDto: TopUpDto) {
         try {
-            const { customer, amount } = body;
-            return await this.paymentService.topUp(customer, amount);
+            return await this.paymentService.topUp(topUpDto);
         } catch (error: any) {
             console.error('Error top-up:', error.message);
         }

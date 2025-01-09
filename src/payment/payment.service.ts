@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { StripeService } from 'src/stripe/stripe.service';
-import Stripe from 'stripe';
+import { CreateCustomerDto } from './dtos/create-customer.dto';
+import { ConfirmPaymentIntentDto, CreatePaymentIntentDto } from './dtos/payment-intent.dto';
+import { CreateSubscriptionDto, UpdateSubscriptionDto } from './dtos/subscription.dto';
+import { TopUpDto } from './dtos/top-up.dto';
 
 @Injectable()
 export class PaymentService {
@@ -8,75 +11,140 @@ export class PaymentService {
 
     // 1. Get prices of the product
     async getPriceList() {
-        const stripe = this.stripeService.getStripeInstance();
-        const prices = await stripe.prices.list({
-            lookup_keys: ['base_plan'], // Change as per your pricing strategy
-            expand: ['data.product']
-        });
-        return prices;
+        try {
+            const stripe = this.stripeService.getStripeInstance();
+            return await stripe.prices.list({
+                lookup_keys: ['base_plan'], // Change as per your pricing strategy
+                expand: ['data.product']
+            });
+        } catch (error) {
+            if (error instanceof Error) {
+                console.error('Error fetching price list:', error.message);
+            } else {
+                console.error('An unknown error occurred:', error);
+            }
+            throw error;
+        }
     }
 
     // 2. Create a customer
-    async createCustomer(email: string, name: string, address: { line1: string, line2?: string, city?: string, state?: string, postal_code?: string, country?: string }, phone: string, paymentMethod: string) {
+    async createCustomer(customer: CreateCustomerDto) {
+        const { email, name, address, phone, paymentMethod } = customer;
         const stripe = this.stripeService.getStripeInstance();
-        return stripe.customers.create({
-            email,
-            name,
-            address,
-            phone,
-            payment_method: paymentMethod || "pm_card_visa", // Default if no method provided
-            invoice_settings: {
-                default_payment_method: "pm_card_visa" // You can customize this based on the payment method
-            },
-            preferred_locales: ["en"]
-        });
+
+        // Check if a customer with the same email already exists
+        const existingCustomer = await stripe.customers.list({ email, limit: 1 });
+
+        // If a customer already exists, return the existing customer
+        if (existingCustomer.data.length > 0) {
+            console.log('Customer with this email already exists:', existingCustomer.data[0]);
+            return existingCustomer.data[0];
+        }
+        try {
+            return stripe.customers.create({
+                email,
+                name,
+                address,
+                phone,
+                payment_method: paymentMethod || "pm_card_visa",
+                invoice_settings: {
+                    default_payment_method: "pm_card_visa" // customize this based on the payment method
+                },
+                preferred_locales: ["en"]
+            });
+        } catch (error) {
+            if (error instanceof Error) {
+                console.error('Error creating customer:', error.message);
+            } else {
+                console.error('An unknown error occurred:', error);
+            }
+
+            throw error;
+        }
     }
 
     // 3. Create payment intent
-    async createPaymentIntent(customerId: string, amount: number, currency: string, idempotencyKey: string) {
+    async createPaymentIntent(PaymentIntent: CreatePaymentIntentDto) {
         const stripe = this.stripeService.getStripeInstance();
-        return stripe.paymentIntents.create({
-            amount,
-            currency,
-            customer: customerId,
-            payment_method_types: ['card'],
-            payment_method: "pm_card_visa", // Default payment method
-        }, {
-            idempotencyKey // Ensures this operation is unique and idempotent
-        });
+        const { customerId, amount, currency, idempotencyKey } = PaymentIntent;
+        try {
+            return stripe.paymentIntents.create({
+                amount,
+                currency,
+                customer: customerId,
+                payment_method_types: ['card'],
+                payment_method: "pm_card_visa", // Default payment method
+            }, {
+                idempotencyKey // Ensures this operation is unique and idempotent
+            });
+        } catch (error) {
+            if (error instanceof Error) {
+                console.error('Error creating payment intent:', error.message);
+            } else {
+                console.error('An unknown error occurred:', error);
+            }
+            throw error;
+        }
     }
 
     // 4. Retrieve payment intent by ID
     async retrievePaymentIntent(paymentIntentId: string) {
         const stripe = this.stripeService.getStripeInstance();
-        return stripe.paymentIntents.retrieve(paymentIntentId);
+        try {
+            return stripe.paymentIntents.retrieve(paymentIntentId);
+        } catch (error) {
+            if (error instanceof Error) {
+                console.error('Error retrieving payment intent:', error);
+            } else {
+                console.error('An unknown error occurred:', error);
+            }
+            throw error;
+        }
     }
 
     // 5. Confirm payment intent
-    async confirmPaymentIntent(paymentIntentId: string, paymentMethodId: string) {
+    async confirmPaymentIntent(confirmPaymentIntent: ConfirmPaymentIntentDto) {
         const stripe = this.stripeService.getStripeInstance();
-        return stripe.paymentIntents.confirm(paymentIntentId, {
-            payment_method: paymentMethodId,
-        });
+        try {
+            const {paymentIntentId, paymentMethodId} = confirmPaymentIntent;
+            return stripe.paymentIntents.confirm(paymentIntentId, {
+                payment_method: paymentMethodId,
+            });
+        } catch (error) {
+            console.error('Error retrieving payment intent:', error);
+            throw error;
+        }
     }
 
     // 6. Create invoice
     async createInvoice(customer: string) {
         const stripe = this.stripeService.getStripeInstance();
-        return stripe.invoices.create({
-            customer,
-        });
+        try {
+            return stripe.invoices.create({
+                customer,
+            });
+        } catch (error) {
+            console.error('Error creating invoice:', error);
+            throw error;
+        }
     }
 
     // 7. Get invoice details by invoice ID
     async invoicePaymentIntent(invoiceId: string) {
         const stripe = this.stripeService.getStripeInstance();
-        return stripe.invoices.retrieve(invoiceId);
+        try {
+            return stripe.invoices.retrieve(invoiceId);
+        } catch (error) {
+            console.error('Error retrieving invoice details:', error);
+            throw error;
+        }
     }
 
     // 8. Create subscription with dynamic price ID and optional trial
-    async createSubscription(customerId: string, priceId: string) {
+    async createSubscription(createSubscription: CreateSubscriptionDto) {
         const stripe = this.stripeService.getStripeInstance();
+        const { customerId, priceId } = createSubscription;
+        
         try {
             const subscription = await stripe.subscriptions.create({
                 customer: customerId,
@@ -95,21 +163,26 @@ export class PaymentService {
     // 9. Preview invoices for upcoming subscription
     async previewInvoices(customerId: string, priceId: string, subscriptionId: string) {
         const stripe = this.stripeService.getStripeInstance();
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        const invoice = await stripe.invoices.retrieveUpcoming({
-            customer: customerId,
-            subscription: subscriptionId,
-            subscription_items: [{
-                id: subscription.items.data[0].id,
-                price: priceId,
-            }],
-        });
-        return invoice;
+        try {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            return await stripe.invoices.retrieveUpcoming({
+                customer: customerId,
+                subscription: subscriptionId,
+                subscription_items: [{
+                    id: subscription.items.data[0].id,
+                    price: priceId,
+                }],
+            });
+        } catch (error) {
+            console.error('Error previewing invoice:', error);
+            throw error;
+        }
     }
 
     // 10. Update subscription (e.g., change plan or quantity)
-    async updateSubscription(subscriptionId: string, priceId: string, quantity: number = 1) {
+    async updateSubscription(subscriptionId: string, updateSubscription:UpdateSubscriptionDto) {
         const stripe = this.stripeService.getStripeInstance();
+        const { priceId, quantity } = updateSubscription;
         try {
             return await stripe.subscriptions.update(subscriptionId, {
                 items: [{
@@ -138,20 +211,29 @@ export class PaymentService {
     // 12. Retrieve a subscription by subscription ID
     async getSubscription(subscriptionId: string) {
         const stripe = this.stripeService.getStripeInstance();
-        return await stripe.subscriptions.retrieve(subscriptionId);
+        try {
+            return await stripe.subscriptions.retrieve(subscriptionId);
+        } catch (error) {
+            console.error('Error retrieving subscription:', error);
+            throw error;
+        }
     }
 
     async topUp(
-        customerId: string,
-        amount: number,
-    ): Promise<Stripe.InvoiceItem> {
+        topUp: TopUpDto
+    ) {
         const stripe = this.stripeService.getStripeInstance();
-        return stripe.invoiceItems.create({
-            customer: customerId,
-            amount: amount * 100,
-            currency: 'usd', // Adjust to your currency
-            description: 'Subscription Top-Up',
-        });
+        const { customer, amount } = topUp;
+        try {
+            return stripe.invoiceItems.create({
+                customer: customer,
+                amount: amount * 100,
+                currency: 'usd', // Adjust to your currency
+                description: 'Subscription Top-Up',
+            });
+        } catch (error) {
+            console.error('Error top-up:', error);
+            throw error;
+        }
     }
-
 }
