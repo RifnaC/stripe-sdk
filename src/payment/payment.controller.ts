@@ -2,7 +2,7 @@ import { Controller, Post, Get, Param, Body, Query, HttpCode, HttpStatus, Res, V
 import { PaymentService } from './payment.service';
 import { CreateCustomerDto } from './dtos/create-customer.dto';
 import { ConfirmPaymentIntentDto, CreatePaymentIntentDto } from './dtos/payment-intent.dto';
-import { CreateSubscriptionDto, UpdateSubscriptionDto } from './dtos/subscription.dto';
+import { UpdateSubscriptionDto } from './dtos/subscription.dto';
 import { TopUpDto } from './dtos/top-up.dto';
 
 @Controller('payment')
@@ -70,10 +70,10 @@ export class PaymentController {
     @Post('payment-intent/confirm')
     @HttpCode(HttpStatus.OK)
     @UsePipes(new ValidationPipe())
-    async confirmPaymentIntent(@Body() confirmPaymentIntentDto: ConfirmPaymentIntentDto
+    async processPaymentAndCreateSubscription(@Body() confirmPaymentIntentDto: ConfirmPaymentIntentDto
     ) {
         try {
-            const confirmation = await this.paymentService.confirmPaymentIntent(
+            const confirmation = await this.paymentService.processPaymentAndCreateSubscription(
                 confirmPaymentIntentDto
             );
             return { confirmation };
@@ -109,23 +109,7 @@ export class PaymentController {
         }
     }
 
-    // 8. Create Subscription: Manage product subscriptions, including trial and price plans
-    @Post('subscription')
-    @HttpCode(HttpStatus.CREATED)
-    @UsePipes(new ValidationPipe())
-    async createSubscription(@Body() createSubscriptionDto: CreateSubscriptionDto) {
-        try {
-            const subscription = await this.paymentService.createSubscription(
-                createSubscriptionDto
-            );
-            return { subscription };
-        } catch (error) {
-            console.error('Error creating subscription:', error);
-            throw error;
-        }
-    }
-
-    // 9. Preview Invoices: Preview upcoming invoices based on customer and subscription ID
+    // 8. Preview Invoices: Preview upcoming invoices based on customer and subscription ID
     @Get('subscription/:subscriptionId/preview')
     @HttpCode(HttpStatus.OK)
     async previewInvoices(
@@ -146,7 +130,7 @@ export class PaymentController {
         }
     }
 
-    // 10. Update Subscription: Update subscriptions (e.g., change plans or quantities)
+    // 9. Update Subscription: Update subscriptions (e.g., change plans or quantities)
     @Post('subscription/:subscriptionId/update')
     @HttpCode(HttpStatus.OK)
     @UsePipes(new ValidationPipe())
@@ -166,7 +150,7 @@ export class PaymentController {
         }
     }
 
-    // 11. Cancel Subscription: Cancel subscriptions
+    // 10. Cancel Subscription: Cancel subscriptions
     @Post('subscription/:subscriptionId/cancel')
     @HttpCode(HttpStatus.OK)
     async cancelSubscription(@Param('subscriptionId') subscriptionId: string) {
@@ -179,7 +163,7 @@ export class PaymentController {
         }
     }
 
-    // 12. Get Subscription: Retrieve a subscription by its ID
+    // 11. Get Subscription: Retrieve a subscription by its ID
     @Get('subscription/:subscriptionId')
     @HttpCode(HttpStatus.OK)
     async getSubscription(@Param('subscriptionId') subscriptionId: string) {
@@ -192,7 +176,7 @@ export class PaymentController {
         }
     }
 
-    // 13. Top-up: Top up an additional block
+    // 12. Top-up: Top up an additional block
     @Post('top-up')
     @HttpCode(HttpStatus.OK)
     @UsePipes(new ValidationPipe())

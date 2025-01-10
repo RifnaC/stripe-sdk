@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { StripeService } from 'src/stripe/stripe.service';
 import { CreateCustomerDto } from './dtos/create-customer.dto';
 import { ConfirmPaymentIntentDto, CreatePaymentIntentDto } from './dtos/payment-intent.dto';
-import { CreateSubscriptionDto, UpdateSubscriptionDto } from './dtos/subscription.dto';
+import { UpdateSubscriptionDto } from './dtos/subscription.dto';
 import { TopUpDto } from './dtos/top-up.dto';
 
 @Injectable()
@@ -106,45 +106,25 @@ export class PaymentService {
     async confirmPaymentIntent(confirmPaymentIntent: ConfirmPaymentIntentDto) {
         const stripe = this.stripeService.getStripeInstance();
         try {
-            const {paymentIntentId, paymentMethodId} = confirmPaymentIntent;
+            const { paymentIntentId, paymentMethodId } = confirmPaymentIntent;
             return stripe.paymentIntents.confirm(paymentIntentId, {
                 payment_method: paymentMethodId,
             });
         } catch (error) {
-            console.error('Error retrieving payment intent:', error);
+            if (error instanceof Error) {
+                console.error('Error retrieving payment intent:', error.message);
+            } else {
+                console.error('An unknown error occurred:', error);
+            }
             throw error;
         }
     }
 
-    // 6. Create invoice
-    async createInvoice(customer: string) {
-        const stripe = this.stripeService.getStripeInstance();
-        try {
-            return stripe.invoices.create({
-                customer,
-            });
-        } catch (error) {
-            console.error('Error creating invoice:', error);
-            throw error;
-        }
-    }
-
-    // 7. Get invoice details by invoice ID
-    async invoicePaymentIntent(invoiceId: string) {
-        const stripe = this.stripeService.getStripeInstance();
-        try {
-            return stripe.invoices.retrieve(invoiceId);
-        } catch (error) {
-            console.error('Error retrieving invoice details:', error);
-            throw error;
-        }
-    }
-
-    // 8. Create subscription with dynamic price ID and optional trial
-    async createSubscription(createSubscription: CreateSubscriptionDto) {
+    // 6. Create subscription with dynamic price ID and optional trial
+    async createSubscription(createSubscription: ConfirmPaymentIntentDto) {
         const stripe = this.stripeService.getStripeInstance();
         const { customerId, priceId } = createSubscription;
-        
+
         try {
             const subscription = await stripe.subscriptions.create({
                 customer: customerId,
@@ -160,7 +140,54 @@ export class PaymentService {
         }
     }
 
-    // 9. Preview invoices for upcoming subscription
+    // 7. Update subscription with dynamic price ID and optional quantity
+    async processPaymentAndCreateSubscription(
+        confirmPaymentIntentDto: ConfirmPaymentIntentDto,
+    ) {
+        try {
+            const confirmedPaymentIntent = await this.confirmPaymentIntent(confirmPaymentIntentDto);
+
+            if (confirmedPaymentIntent.status !== 'succeeded') {
+                throw new Error('Payment confirmation failed.');
+            }
+
+            const subscription = await this.createSubscription(confirmPaymentIntentDto);
+            return subscription;
+        } catch (error) {
+            if (error instanceof Error) {
+                console.error('Error processing payment and creating subscription:', error.message);
+            } else {
+                console.error('An unknown error occurred:', error);
+            }
+            throw error;
+        }
+    }
+
+    // 8. Create invoice
+    async createInvoice(customer: string) {
+        const stripe = this.stripeService.getStripeInstance();
+        try {
+            return stripe.invoices.create({
+                customer,
+            });
+        } catch (error) {
+            console.error('Error creating invoice:', error);
+            throw error;
+        }
+    }
+
+    // 9. Get invoice details by invoice ID
+    async invoicePaymentIntent(invoiceId: string) {
+        const stripe = this.stripeService.getStripeInstance();
+        try {
+            return stripe.invoices.retrieve(invoiceId);
+        } catch (error) {
+            console.error('Error retrieving invoice details:', error);
+            throw error;
+        }
+    }
+
+    // 10. Preview invoices for upcoming subscription
     async previewInvoices(customerId: string, priceId: string, subscriptionId: string) {
         const stripe = this.stripeService.getStripeInstance();
         try {
@@ -179,8 +206,8 @@ export class PaymentService {
         }
     }
 
-    // 10. Update subscription (e.g., change plan or quantity)
-    async updateSubscription(subscriptionId: string, updateSubscription:UpdateSubscriptionDto) {
+    // 11. Update subscription (e.g., change plan or quantity)
+    async updateSubscription(subscriptionId: string, updateSubscription: UpdateSubscriptionDto) {
         const stripe = this.stripeService.getStripeInstance();
         const { priceId, quantity } = updateSubscription;
         try {
@@ -197,7 +224,7 @@ export class PaymentService {
         }
     }
 
-    // 11. Cancel subscription
+    // 12. Cancel subscription
     async cancelSubscription(subscriptionId: string) {
         const stripe = this.stripeService.getStripeInstance();
         try {
@@ -208,7 +235,7 @@ export class PaymentService {
         }
     }
 
-    // 12. Retrieve a subscription by subscription ID
+    // 13. Retrieve a subscription by subscription ID
     async getSubscription(subscriptionId: string) {
         const stripe = this.stripeService.getStripeInstance();
         try {
@@ -219,6 +246,7 @@ export class PaymentService {
         }
     }
 
+    // 14. Top-up a customer's credit card balance
     async topUp(
         topUp: TopUpDto
     ) {

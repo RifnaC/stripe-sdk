@@ -27,4 +27,12 @@ export class ConfirmPaymentIntentDto {
   @IsString()
   @IsNotEmpty()
   paymentMethodId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  customerId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  priceId: string;
 }
