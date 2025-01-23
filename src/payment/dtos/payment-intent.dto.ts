@@ -1,4 +1,10 @@
-import { IsString, IsNumber, IsNotEmpty, IsPositive, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsNotEmpty,
+  IsPositive,
+  IsOptional,
+} from 'class-validator';
 
 export class CreatePaymentIntentDto {
   @IsString()
@@ -15,9 +21,8 @@ export class CreatePaymentIntentDto {
 
   @IsString()
   @IsOptional()
-  idempotencyKey?: string; 
+  idempotencyKey?: string;
 }
-
 
 export class ConfirmPaymentIntentDto {
   @IsString()
